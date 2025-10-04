@@ -34,7 +34,8 @@ class BatchModel {
 
       query += ' ORDER BY b.expiry_date ASC, b.created_at DESC';
 
-      const [rows] = await pool.query(query, params);
+      // ✅ FIXED: Use pool.execute instead of pool.query
+      const [rows] = await pool.execute(query, params);
       return rows;
     } catch (error) {
       throw error;
@@ -43,7 +44,8 @@ class BatchModel {
 
   async getByProductId(productId) {
     try {
-      const [rows] = await pool.query(`
+      // ✅ FIXED: Use pool.execute instead of pool.query
+      const [rows] = await pool.execute(`
         SELECT b.*, w.name as warehouse_name, w.code as warehouse_code
         FROM batches b
         INNER JOIN warehouses w ON b.warehouse_id = w.id
@@ -58,7 +60,8 @@ class BatchModel {
 
   async findById(id) {
     try {
-      const [rows] = await pool.query(`
+      // ✅ FIXED: Use pool.execute instead of pool.query
+      const [rows] = await pool.execute(`
         SELECT b.*, p.sku, p.name as product_name, w.name as warehouse_name
         FROM batches b
         INNER JOIN products p ON b.product_id = p.id
@@ -83,7 +86,10 @@ class BatchModel {
         qty_available 
       } = batchData;
 
-      const [result] = await pool.query(
+      console.log('📦 BatchModel.create called with:', batchData);
+
+      // ✅ FIXED: Use pool.execute instead of pool.query
+      const [result] = await pool.execute(
         `INSERT INTO batches 
          (product_id, warehouse_id, batch_no, manufacturing_date, expiry_date, qty_received, qty_available) 
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -97,15 +103,19 @@ class BatchModel {
           qty_available || qty_received
         ]
       );
+      
+      console.log('✅ BatchModel.create result:', result);
       return result.insertId;
     } catch (error) {
+      console.error('❌ BatchModel.create error:', error);
       throw error;
     }
   }
 
   async updateQuantity(id, newQtyAvailable) {
     try {
-      const [result] = await pool.query(
+      // ✅ FIXED: Use pool.execute instead of pool.query
+      const [result] = await pool.execute(
         'UPDATE batches SET qty_available = ? WHERE id = ?',
         [newQtyAvailable, id]
       );
@@ -125,7 +135,8 @@ class BatchModel {
         orderBy = 'b.created_at DESC';
       }
 
-      const [rows] = await pool.query(`
+      // ✅ FIXED: Use pool.execute instead of pool.query
+      const [rows] = await pool.execute(`
         SELECT b.*
         FROM batches b
         WHERE b.product_id = ? 
@@ -141,7 +152,8 @@ class BatchModel {
 
   async getExpiringBatches(daysAhead = 30) {
     try {
-      const [rows] = await pool.query(`
+      // ✅ FIXED: Use pool.execute instead of pool.query
+      const [rows] = await pool.execute(`
         SELECT b.*, p.sku, p.name as product_name, w.name as warehouse_name
         FROM batches b
         INNER JOIN products p ON b.product_id = p.id
@@ -165,7 +177,8 @@ class BatchModel {
         throw new Error('Cannot delete batch with available stock');
       }
 
-      const [result] = await pool.query('DELETE FROM batches WHERE id = ?', [id]);
+      // ✅ FIXED: Use pool.execute instead of pool.query
+      const [result] = await pool.execute('DELETE FROM batches WHERE id = ?', [id]);
       return result.affectedRows > 0;
     } catch (error) {
       throw error;

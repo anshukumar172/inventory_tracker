@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Typography, Select, MenuItem, FormControl, InputLabel, Button } from "@mui/material";
 import DataTable from "../components/DataTable";
-import { fetchWarehouses } from "../api/warehouses";
+import { fetchWarehouses, fetchWarehouseBatches } from "../api/warehouses";
 
 const columns = [
-  { field: "productName", headerName: "Product", width: 200 },
-  { field: "batchNo", headerName: "Batch No", width: 150 },
-  { field: "quantity", headerName: "Quantity", width: 120 },
+  { field: "product_name", headerName: "Product", width: 200 }, // ✅ Fixed field name
+  { field: "batch_no", headerName: "Batch No", width: 150 },    // ✅ Fixed field name
+  { field: "qty_available", headerName: "Quantity", width: 120 }, // ✅ Fixed field name
   {
     field: "actions",
     headerName: "Actions",
@@ -18,7 +18,8 @@ const columns = [
 const WarehouseView = () => {
   const [warehouses, setWarehouses] = useState([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
-  const [stockList, setStockList] = useState([]); // fetch stock per warehouse from API
+  const [stockList, setStockList] = useState([]);
+  const [loading, setLoading] = useState(false); // ✅ Add loading state
 
   useEffect(() => {
     fetchWarehouses().then(res => {
@@ -27,10 +28,36 @@ const WarehouseView = () => {
     });
   }, []);
 
+  // ✅ FIXED: Implement the missing API call
   useEffect(() => {
     if (!selectedWarehouse) return;
-    // TODO: call API to fetch stock list for selectedWarehouse
-    // For example: fetchStockList(selectedWarehouse).then(setStockList);
+    
+    setLoading(true);
+    console.log(`🏢 Fetching batches for warehouse: ${selectedWarehouse}`);
+    
+    fetchWarehouseBatches(selectedWarehouse)
+      .then(response => {
+        console.log('✅ API Response:', response.data);
+        
+        // ✅ Map backend response to frontend format
+        const batches = response.data.data || [];
+        const mappedBatches = batches.map((batch, index) => ({
+          id: batch.id || index, // DataTable needs an ID
+          product_name: batch.product_name,
+          batch_no: batch.batch_no,
+          qty_available: batch.qty_available,
+          product_id: batch.product_id,
+          warehouse_name: batch.warehouse_name
+        }));
+        
+        setStockList(mappedBatches);
+        setLoading(false);
+      })
+      .catch(error => {
+        console.error('❌ Error fetching warehouse batches:', error);
+        setStockList([]);
+        setLoading(false);
+      });
   }, [selectedWarehouse]);
 
   return (
@@ -51,6 +78,15 @@ const WarehouseView = () => {
           ))}
         </Select>
       </FormControl>
+      
+      {/* ✅ Add loading indicator and data count */}
+      {loading && <Typography>Loading batches...</Typography>}
+      {!loading && selectedWarehouse && (
+        <Typography sx={{ mb: 1 }}>
+          Found {stockList.length} batches in selected warehouse
+        </Typography>
+      )}
+      
       <DataTable rows={stockList} columns={columns} />
     </>
   );
