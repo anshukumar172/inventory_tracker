@@ -12,14 +12,21 @@ exports.getAllProducts = async (req, res) => {
 
 exports.createProduct = async (req, res) => {
   try {
-    const { sku, name, description, hsn_code, unit, default_tax_rate } = req.body;
+    const { sku, name, description, hsn_code, unit, default_tax_rate, cost_price, selling_price } = req.body;
     
     if (!sku || !name) {
       return res.status(400).json({ error: 'SKU and Name are required' });
     }
 
     const insertedId = await productModel.create({ 
-      sku, name, description, hsn_code, unit, default_tax_rate 
+      sku, 
+      name, 
+      description, 
+      hsn_code, 
+      unit, 
+      default_tax_rate,
+      cost_price: cost_price || 0,
+      selling_price: selling_price || 0
     });
     
     res.status(201).json({ 
@@ -51,21 +58,25 @@ exports.getProductById = async (req, res) => {
   }
 };
 
-// ADD THESE MISSING FUNCTIONS:
-
 exports.updateProduct = async (req, res) => {
   try {
     const productId = req.params.id;
     console.log(`🔄 Updating product ${productId}:`, req.body);
     
-    const { name, description, hsn_code, unit, default_tax_rate } = req.body;
+    const { name, description, hsn_code, unit, default_tax_rate, cost_price, selling_price } = req.body;
     
     if (!name) {
       return res.status(400).json({ error: 'Product name is required' });
     }
 
     const updated = await productModel.updateById(productId, {
-      name, description, hsn_code, unit, default_tax_rate
+      name, 
+      description, 
+      hsn_code, 
+      unit, 
+      default_tax_rate,
+      cost_price,
+      selling_price
     });
     
     if (!updated) {

@@ -3,6 +3,7 @@ import { Typography, Button, Box, Modal, TextField, Autocomplete } from "@mui/ma
 import DataTable from "../components/DataTable";
 import { fetchBatches, createBatch } from "../api/batches";
 import { fetchProducts } from "../api/products";
+import { fetchWarehouses } from "../api/warehouses";
 
 const style = {
   position: "absolute",
@@ -18,6 +19,7 @@ const style = {
 const columns = [
   { field: "batch_no", headerName: "Batch No", width: 150 },
   { field: "product_name", headerName: "Product", width: 200 },
+  { field: "warehouse_name", headerName: "Warehouse", width: 150 },
   { field: "manufacturing_date", headerName: "Manufactured", width: 130 },
   { field: "expiry_date", headerName: "Expiry", width: 130 },
   { field: "qty_available", headerName: "Quantity", width: 100 },
@@ -26,8 +28,10 @@ const columns = [
 const BatchManagement = () => {
   const [batches, setBatches] = useState([]);
   const [products, setProducts] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [open, setOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedWarehouse, setSelectedWarehouse] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     batch_no: "",
@@ -36,16 +40,17 @@ const BatchManagement = () => {
     qty_received: 0,
   });
 
-  // Load all batches and products on component mount
+  // Load all batches, products, and warehouses on component mount
   useEffect(() => {
     loadBatches();
     loadProducts();
+    loadWarehouses();
   }, []);
 
   const loadBatches = async () => {
     try {
       setLoading(true);
-      const response = await fetchBatches(); // Fetch all batches
+      const response = await fetchBatches();
       setBatches(response.data || []);
     } catch (error) {
       console.error('Failed to load batches:', error);
@@ -65,6 +70,16 @@ const BatchManagement = () => {
     }
   };
 
+  const loadWarehouses = async () => {
+    try {
+      const response = await fetchWarehouses();
+      setWarehouses(response.data || []);
+    } catch (error) {
+      console.error('Failed to load warehouses:', error);
+      setWarehouses([]);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(data => ({ ...data, [name]: value }));
@@ -76,6 +91,11 @@ const BatchManagement = () => {
       return;
     }
 
+    if (!selectedWarehouse) {
+      alert('Please select a warehouse');
+      return;
+    }
+
     if (!formData.batch_no) {
       alert('Please enter a batch number');
       return;
@@ -84,7 +104,8 @@ const BatchManagement = () => {
     try {
       const batchData = {
         ...formData,
-        product_id: selectedProduct.id
+        product_id: selectedProduct.id,
+        warehouse_id: selectedWarehouse.id
       };
 
       await createBatch(selectedProduct.id, batchData);
@@ -108,6 +129,7 @@ const BatchManagement = () => {
       qty_received: 0,
     });
     setSelectedProduct(null);
+    setSelectedWarehouse(null);
   };
 
   return (
@@ -147,6 +169,23 @@ const BatchManagement = () => {
               <TextField
                 {...params}
                 label="Select Product"
+                margin="normal"
+                required
+                fullWidth
+              />
+            )}
+          />
+
+          {/* ✅ NEW: Warehouse Selection */}
+          <Autocomplete
+            options={warehouses}
+            getOptionLabel={(option) => option.name}
+            value={selectedWarehouse}
+            onChange={(event, newValue) => setSelectedWarehouse(newValue)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Select Warehouse"
                 margin="normal"
                 required
                 fullWidth
@@ -209,7 +248,7 @@ const BatchManagement = () => {
             <Button 
               onClick={handleSubmit} 
               variant="contained"
-              disabled={!selectedProduct}
+              disabled={!selectedProduct || !selectedWarehouse}
             >
               Save Batch
             </Button>

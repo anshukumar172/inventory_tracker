@@ -63,18 +63,28 @@ class ProductModel {
   }
 
   async create(productData) {
-    try {
-      const { sku, name, description, hsn_code, unit, default_tax_rate } = productData;
-      const [result] = await pool.query(
-        `INSERT INTO products (sku, name, description, hsn_code, unit, default_tax_rate) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [sku, name, description || '', hsn_code || '', unit || 'nos', default_tax_rate || 18.00]
-      );
-      return result.insertId;
-    } catch (error) {
-      throw error;
-    }
+  try {
+    const { sku, name, description, hsn_code, unit, default_tax_rate, cost_price, selling_price } = productData;
+    const [result] = await pool.query(
+      `INSERT INTO products (sku, name, description, hsn_code, unit, default_tax_rate, cost_price, selling_price) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        sku, 
+        name, 
+        description || '', 
+        hsn_code || '', 
+        unit || 'nos', 
+        default_tax_rate || 18.00,
+        cost_price || 0,
+        selling_price || 0
+      ]
+    );
+    return result.insertId;
+  } catch (error) {
+    throw error;
   }
+}
+
 
   async updateById(id, updateData) {
     try {
@@ -128,5 +138,6 @@ class ProductModel {
     }
   }
 }
+
 
 module.exports = new ProductModel();

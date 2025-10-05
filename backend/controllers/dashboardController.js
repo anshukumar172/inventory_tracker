@@ -1,23 +1,17 @@
-const pool = require('../db');  // ✅ Correct path for your setup
+const pool = require('../db');
 
 const getDashboardKpis = async (req, res) => {
   try {
     console.log('📊 Calculating dashboard KPIs...');
 
-    // Calculate total stock value - FIXED to match your enum values
+    // ✅ FIXED: Calculate total stock value from current batches and product prices
     const stockValueQuery = `
-      SELECT COALESCE(SUM(
-        CASE 
-          WHEN sm.movement_type = 'IN' THEN sm.qty * COALESCE(sm.unit_cost, 0)
-          WHEN sm.movement_type = 'OUT' THEN -(sm.qty * COALESCE(sm.unit_cost, 0))
-          WHEN sm.movement_type = 'TRANSFER' THEN sm.qty * COALESCE(sm.unit_cost, 0)
-          WHEN sm.movement_type = 'ADJUST' THEN sm.qty * COALESCE(sm.unit_cost, 0)
-          ELSE 0 
-        END
-      ), 0) as total_stock_value
-      FROM stock_movements sm
-      WHERE sm.unit_cost IS NOT NULL AND sm.unit_cost > 0
-    `;
+  SELECT COALESCE(SUM(b.qty_available * COALESCE(p.selling_price, p.cost_price, 0)), 0) as total_stock_value
+  FROM batches b
+  INNER JOIN products p ON b.product_id = p.id
+  WHERE b.qty_available > 0
+`;
+
 
     // Low stock count using batches table directly
     const lowStockQuery = `

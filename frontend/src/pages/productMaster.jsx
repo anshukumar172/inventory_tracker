@@ -30,7 +30,9 @@ const ProductMaster = () => {
     description: '',
     hsn_code: '',
     unit: 'nos',
-    default_tax_rate: 18.00
+    default_tax_rate: 18.00,
+    cost_price: 0,
+    selling_price: 0
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,6 +43,8 @@ const ProductMaster = () => {
     { field: 'name', headerName: 'Name', width: 200 },
     { field: 'hsn_code', headerName: 'HSN', width: 100 },
     { field: 'default_tax_rate', headerName: 'Tax Rate', width: 100 },
+    { field: 'cost_price', headerName: 'Cost Price', width: 120 },
+    { field: 'selling_price', headerName: 'Selling Price', width: 120 },
     {
       field: 'actions',
       headerName: 'Actions',
@@ -95,7 +99,9 @@ const ProductMaster = () => {
       description: product.description || '',
       hsn_code: product.hsn_code || '',
       unit: product.unit || 'nos',
-      default_tax_rate: product.default_tax_rate || 18.00
+      default_tax_rate: product.default_tax_rate || 18.00,
+      cost_price: product.cost_price || 0,
+      selling_price: product.selling_price || 0
     });
     setOpen(true);
     setError('');
@@ -110,7 +116,9 @@ const ProductMaster = () => {
       description: '',
       hsn_code: '',
       unit: 'nos',
-      default_tax_rate: 18.00
+      default_tax_rate: 18.00,
+      cost_price: 0,
+      selling_price: 0
     });
     setError('');
   };
@@ -178,7 +186,9 @@ const ProductMaster = () => {
       description: '',
       hsn_code: '',
       unit: 'nos',
-      default_tax_rate: 18.00
+      default_tax_rate: 18.00,
+      cost_price: 0,
+      selling_price: 0
     });
     setOpen(true);
     setError('');
@@ -273,6 +283,31 @@ const ProductMaster = () => {
                 value={formData.default_tax_rate}
                 onChange={handleInputChange}
                 inputProps={{ step: "0.01", min: "0", max: "100" }}
+              />
+            </Grid>
+            {/* ✅ NEW: Cost Price and Selling Price Fields */}
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Cost Price"
+                name="cost_price"
+                type="number"
+                value={formData.cost_price}
+                onChange={handleInputChange}
+                inputProps={{ step: "0.01", min: "0" }}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Selling Price"
+                name="selling_price"
+                type="number"
+                value={formData.selling_price}
+                onChange={handleInputChange}
+                inputProps={{ step: "0.01", min: "0" }}
+                required
               />
             </Grid>
           </Grid>
