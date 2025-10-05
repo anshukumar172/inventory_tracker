@@ -2,19 +2,18 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 require('dotenv').config();
-
 const app = express();
 
 // Security middleware
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" } // ✅ ADD: Allow cross-origin for file downloads
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// ✅ ENHANCED CORS middleware for file downloads
+// CORS middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3001',
   credentials: true,
-  exposedHeaders: ['content-disposition', 'content-type'], // ✅ Important for CSV downloads
+  exposedHeaders: ['content-disposition', 'content-type'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
@@ -36,9 +35,12 @@ const alertsRoutes = require('./routes/alertsRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const batchStandaloneRoutes = require('./routes/batchStandaloneRoutes');
 const stockMovementRoutes = require('./routes/stockMovementRoutes');
-const reportRoutes = require('./routes/reportRoutes'); // ✅ Reports route
+const reportRoutes = require('./routes/reportRoutes');
 
 console.log('✅ All route files loaded');
+
+// ✅ Initialize alert scheduler (automatic alert checking)
+require('./jobs/alertScheduler');
 
 // Mount routes with base paths
 app.use('/api/v1/products', productRoutes);
@@ -51,7 +53,7 @@ app.use('/api/v1/alerts', alertsRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/batches', batchStandaloneRoutes);
 app.use('/api/v1/stock-movements', stockMovementRoutes);
-app.use('/api/v1/reports', reportRoutes); // ✅ Reports mounted
+app.use('/api/v1/reports', reportRoutes);
 
 console.log('🔗 All routes mounted');
 
@@ -66,7 +68,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ✅ ADD: Test route for CSV downloads (for debugging)
+// Test route for CSV downloads
 app.get('/api/v1/test-csv', (req, res) => {
   console.log('📊 Test CSV download requested');
   const csvContent = 'Name,Age,City\nJohn,25,Mumbai\nJane,30,Delhi';
@@ -76,7 +78,7 @@ app.get('/api/v1/test-csv', (req, res) => {
   res.send(csvContent);
 });
 
-// ✅ ADD: Request logging middleware (for debugging)
+// Request logging middleware for reports
 app.use((req, res, next) => {
   if (req.url.includes('/reports/')) {
     console.log(`📊 Report request: ${req.method} ${req.url}`);
@@ -89,17 +91,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// 404 handler (must be after all routes)
+// 404 handler
 app.use((req, res) => {
   console.log(`❌ 404 - Route not found: ${req.method} ${req.url}`);
   res.status(404).json({ error: 'Not Found' });
 });
 
-// Error handler middleware (must be after all)
+// Error handler middleware
 app.use((err, req, res, next) => {
   console.error('❌ Internal Server Error:', err);
   
-  // Don't send HTML error pages for API routes
   if (req.url.startsWith('/api/')) {
     res.status(500).json({ 
       error: 'Internal Server Error',
@@ -116,6 +117,7 @@ app.listen(PORT, () => {
   console.log(`🌐 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 API Base URL: http://localhost:${PORT}/api/v1`);
   console.log(`📊 Reports API: http://localhost:${PORT}/api/v1/reports/gst`);
+  console.log(`🔔 Alerts API: http://localhost:${PORT}/api/v1/alerts`);
   console.log(`🧪 Test CSV: http://localhost:${PORT}/api/v1/test-csv`);
   console.log(`🎯 Frontend CORS allowed from: http://localhost:3001`);
   console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
