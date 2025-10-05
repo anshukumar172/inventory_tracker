@@ -1,8 +1,7 @@
 import axiosClient from "./axiosClient";
 
-// Fetch ALL batches (for general batch management) ✅ ADD THIS
-export const fetchBatches = () => 
-  axiosClient.get('/batches');
+// Fetch ALL batches (for general batch management)
+export const fetchBatches = () => axiosClient.get('/batches');
 
 // Fetch batches for a specific product
 export const fetchBatchesByProduct = (productId) =>
@@ -19,3 +18,5 @@ export const updateBatch = (batchId, data) =>
 // Delete batch (optional)
 export const deleteBatch = (batchId) =>
   axiosClient.delete(`/batches/${batchId}`);
+
+// ... any other batch-related functions you need

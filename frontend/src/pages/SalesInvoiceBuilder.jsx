@@ -1,3 +1,4 @@
+// SalesInvoiceBuilder.js
 import React, { useState, useEffect } from "react";
 import {
   Typography,
@@ -14,6 +15,7 @@ import {
 } from "@mui/material";
 import { fetchCustomers } from "../api/customers";
 import { fetchProducts } from "../api/products";
+import { fetchBatches } from "../api/batches"; // You need to create this API util
 import { createInvoice } from "../api/salesInvoices";
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
@@ -22,9 +24,8 @@ const SalesInvoiceBuilder = () => {
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [items, setItems] = useState([
-    { product: null, batch: null, qty: 1, unit_price: 0 }
-  ]);
+  const [items, setItems] = useState([{ product: null, batch: null, qty: 1, unit_price: 0 }]);
+  const [batchesList, setBatchesList] = useState({});
   const [billingAddress, setBillingAddress] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
 
@@ -33,9 +34,25 @@ const SalesInvoiceBuilder = () => {
     fetchProducts().then(res => setProducts(res.data));
   }, []);
 
+  // Fetch batches when a product is selected or changed
+  useEffect(() => {
+    items.forEach((item, idx) => {
+      if (item.product) {
+        fetchBatches(item.product.id).then(res =>
+          setBatchesList(prev => ({ ...prev, [idx]: res.data }))
+        );
+      }
+    });
+    // eslint-disable-next-line
+  }, [JSON.stringify(items.map(i => i.product?.id))]);
+
   const handleItemChange = (index, field, value) => {
     const newItems = [...items];
     newItems[index][field] = value;
+    // reset batch if product changed
+    if (field === "product") {
+      newItems[index].batch = null;
+    }
     setItems(newItems);
   };
 
@@ -46,9 +63,14 @@ const SalesInvoiceBuilder = () => {
   const removeItem = (index) => {
     const newItems = items.filter((_, i) => i !== index);
     setItems(newItems);
+    // Remove batches for deleted row
+    setBatchesList(prev => {
+      const updated = { ...prev };
+      delete updated[index];
+      return updated;
+    });
   };
 
-  // Calculate totals and taxes on fly here (simplified example)
   const totalAmount = items.reduce((acc, item) => acc + (item.qty * item.unit_price), 0);
 
   const handleSubmit = () => {
@@ -75,14 +97,12 @@ const SalesInvoiceBuilder = () => {
   return (
     <Box sx={{ p: 2, maxWidth: 800, mx: 'auto' }}>
       <Typography variant="h5" gutterBottom>Sales Invoice Builder</Typography>
-
       <Autocomplete
         options={customers}
         getOptionLabel={c => c.name || ""}
         onChange={(e, v) => setSelectedCustomer(v)}
         renderInput={(params) => <TextField {...params} label="Select Customer" margin="normal" required />}
       />
-
       <TextField
         label="Billing Address"
         value={billingAddress}
@@ -101,7 +121,6 @@ const SalesInvoiceBuilder = () => {
         margin="normal"
         onChange={(e) => setShippingAddress(e.target.value)}
       />
-
       <Table sx={{ mt: 2 }}>
         <TableHead>
           <TableRow>
@@ -124,7 +143,16 @@ const SalesInvoiceBuilder = () => {
                   renderInput={(params) => <TextField {...params} label="Product" />}
                 />
               </TableCell>
-              <TableCell><TextField label="Batch" value={item.batch?.batch_no || ""} disabled /></TableCell>
+              <TableCell sx={{ minWidth: 120 }}>
+                <Autocomplete
+                  options={batchesList[index] || []}
+                  getOptionLabel={b => b.batch_no || ""}
+                  value={item.batch}
+                  onChange={(e, v) => handleItemChange(index, "batch", v)}
+                  renderInput={(params) => <TextField {...params} label="Batch" />}
+                  disabled={!item.product}
+                />
+              </TableCell>
               <TableCell>
                 <TextField
                   type="number"
@@ -153,11 +181,9 @@ const SalesInvoiceBuilder = () => {
       <Button startIcon={<AddCircleOutlineIcon />} onClick={addItem} sx={{ mt: 1 }}>
         Add Item
       </Button>
-
       <Typography variant="h6" sx={{ mt: 3 }}>
         Total: ₹{totalAmount.toFixed(2)}
       </Typography>
-
       <Button variant="contained" color="primary" sx={{ mt: 2 }} onClick={handleSubmit}>
         Save Invoice
       </Button>

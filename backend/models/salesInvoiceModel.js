@@ -125,6 +125,16 @@ class SalesInvoiceModel {
         ]);
 
         // Update batch quantity
+        const [batchRows] = await connection.query(
+  'SELECT qty_available FROM batches WHERE id = ?', [item.batch_id]
+);
+if (batchRows.length === 0) {
+  throw new Error(`Batch with ID ${item.batch_id} not found`);
+}
+if (batchRows[0].qty_available < item.qty) {
+  throw new Error(`Insufficient stock in batch ${item.batch_id}: only ${batchRows[0].qty_available} units available`);
+}
+
         await connection.query(
           'UPDATE batches SET qty_available = qty_available - ? WHERE id = ?',
           [item.qty, item.batch_id]
