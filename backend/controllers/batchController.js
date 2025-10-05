@@ -287,17 +287,71 @@ exports.updateBatch = async (req, res) => {
 
 exports.deleteBatch = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const [result] = await pool.execute('DELETE FROM batches WHERE id = ?', [id]);
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Batch not found' });
+    const batchId = req.params.id;
+    console.log(`🗑️ Attempting to delete batch ${batchId}`);
+    
+    // ✅ Check if batch has been used in sales invoices
+    const [invoiceItems] = await pool.execute(`
+      SELECT COUNT(*) as item_count 
+      FROM sales_invoice_items 
+      WHERE batch_id = ?
+    `, [batchId]);
+    
+    if (invoiceItems[0].item_count > 0) {
+      console.log(`❌ Batch ${batchId} used in ${invoiceItems[0].item_count} invoice(s)`);
+      return res.status(400).json({ 
+        success: false,
+        error: `Cannot delete batch. It has been used in ${invoiceItems[0].item_count} sales invoice(s). Batches with transaction history cannot be deleted for audit purposes.`
+      });
     }
-
-    res.json({ message: 'Batch deleted successfully' });
+    
+    // ✅ Check if batch has stock movements
+    const [movements] = await pool.execute(`
+      SELECT COUNT(*) as movement_count 
+      FROM stock_movements 
+      WHERE batch_id = ?
+    `, [batchId]);
+    
+    if (movements[0].movement_count > 0) {
+      console.log(`❌ Batch ${batchId} has ${movements[0].movement_count} stock movement(s)`);
+      return res.status(400).json({ 
+        success: false,
+        error: `Cannot delete batch. It has ${movements[0].movement_count} stock movement record(s). Batches with movement history cannot be deleted.`
+      });
+    }
+    
+    // ✅ If all checks pass, delete the batch
+    const [result] = await pool.execute('DELETE FROM batches WHERE id = ?', [batchId]);
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Batch not found' 
+      });
+    }
+    
+    console.log(`✅ Batch ${batchId} deleted successfully`);
+    res.json({ 
+      success: true,
+      message: 'Batch deleted successfully' 
+    });
+    
   } catch (error) {
-    console.error('Error deleting batch:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('❌ Error deleting batch:', error);
+    
+    // Handle foreign key constraint errors
+    if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.code === 'ER_ROW_IS_REFERENCED') {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Cannot delete batch. It is referenced by sales invoices or other records. Please ensure all related transactions are removed first.'
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to delete batch. Please try again.',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
+

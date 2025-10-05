@@ -1,4 +1,5 @@
 const productModel = require('../models/productModel');
+const pool = require('../db');
 
 exports.getAllProducts = async (req, res) => {
   try {
@@ -99,22 +100,68 @@ exports.updateProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
   try {
     const productId = req.params.id;
-    console.log(`🗑️ Deleting product ${productId}`);
+    console.log(`🗑️ Attempting to delete product ${productId}`);
     
+    // ✅ Check if product has batches
+    const [batches] = await pool.query(
+      'SELECT COUNT(*) as batch_count FROM batches WHERE product_id = ?',
+      [productId]
+    );
+    
+    if (batches[0].batch_count > 0) {
+      console.log(`❌ Product ${productId} has ${batches[0].batch_count} batch(es)`);
+      return res.status(400).json({ 
+        error: `Cannot delete product. It has ${batches[0].batch_count} batch(es) associated with it. Please delete or transfer all batches first.`
+      });
+    }
+    
+    // ✅ Check if product has been used in sales invoices
+    const [invoiceItems] = await pool.query(`
+      SELECT COUNT(*) as item_count 
+      FROM sales_invoice_items 
+      WHERE product_id = ?
+    `, [productId]);
+    
+    if (invoiceItems[0].item_count > 0) {
+      console.log(`❌ Product ${productId} used in ${invoiceItems[0].item_count} invoice(s)`);
+      return res.status(400).json({ 
+        error: `Cannot delete product. It has been used in ${invoiceItems[0].item_count} sales invoice(s). Products with transaction history cannot be deleted for audit purposes.`
+      });
+    }
+    
+    // ✅ Check if product has stock movements
+    const [movements] = await pool.query(
+      'SELECT COUNT(*) as movement_count FROM stock_movements WHERE product_id = ?',
+      [productId]
+    );
+    
+    if (movements[0].movement_count > 0) {
+      console.log(`❌ Product ${productId} has ${movements[0].movement_count} stock movement(s)`);
+      return res.status(400).json({ 
+        error: `Cannot delete product. It has ${movements[0].movement_count} stock movement record(s). Products with movement history cannot be deleted.`
+      });
+    }
+    
+    // ✅ If all checks pass, delete the product
     const deleted = await productModel.deleteById(productId);
     
     if (!deleted) {
       return res.status(404).json({ error: 'Product not found' });
     }
     
+    console.log(`✅ Product ${productId} deleted successfully`);
     res.json({ message: 'Product deleted successfully' });
+    
   } catch (error) {
-    console.error('Error deleting product:', error);
-    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+    console.error('❌ Error deleting product:', error);
+    
+    // Handle foreign key constraint errors
+    if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.code === 'ER_ROW_IS_REFERENCED') {
       return res.status(400).json({ 
-        error: 'Cannot delete product with existing batches or transactions' 
+        error: 'Cannot delete product. It is referenced by other records in the system. Please ensure all batches, invoices, and stock movements are removed first.'
       });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    
+    res.status(500).json({ error: 'Failed to delete product. Please try again.' });
   }
 };

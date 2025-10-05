@@ -1,9 +1,23 @@
 import React, { useEffect, useState } from "react";
-import { Typography, Button, Box, Modal, TextField, Autocomplete } from "@mui/material";
+import { 
+  Typography, 
+  Button, 
+  Box, 
+  Modal, 
+  TextField, 
+  Autocomplete,
+  Chip,
+  IconButton,
+  Alert
+} from "@mui/material";
 import DataTable from "../components/DataTable";
-import { fetchBatches, createBatch } from "../api/batches";
+import { fetchBatches, createBatch, deleteBatch } from "../api/batches";
 import { fetchProducts } from "../api/products";
 import { fetchWarehouses } from "../api/warehouses";
+import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 const style = {
   position: "absolute",
@@ -14,16 +28,9 @@ const style = {
   bgcolor: "background.paper",
   boxShadow: 24,
   p: 4,
+  maxHeight: '90vh',
+  overflowY: 'auto'
 };
-
-const columns = [
-  { field: "batch_no", headerName: "Batch No", width: 150 },
-  { field: "product_name", headerName: "Product", width: 200 },
-  { field: "warehouse_name", headerName: "Warehouse", width: 150 },
-  { field: "manufacturing_date", headerName: "Manufactured", width: 130 },
-  { field: "expiry_date", headerName: "Expiry", width: 130 },
-  { field: "qty_available", headerName: "Quantity", width: 100 },
-];
 
 const BatchManagement = () => {
   const [batches, setBatches] = useState([]);
@@ -33,12 +40,69 @@ const BatchManagement = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedWarehouse, setSelectedWarehouse] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     batch_no: "",
     manufacturing_date: "",
     expiry_date: "",
     qty_received: 0,
   });
+
+  // Define columns with actions and formatted dates
+  const columns = [
+    { field: "batch_no", headerName: "Batch No", width: 150 },
+    { field: "product_name", headerName: "Product", width: 200 },
+    { field: "warehouse_name", headerName: "Warehouse", width: 180 },
+    { 
+      field: "manufacturing_date", 
+      headerName: "Manufactured", 
+      width: 130,
+      valueFormatter: (params) => {
+        return params.value ? new Date(params.value).toLocaleDateString('en-IN') : 'N/A';
+      }
+    },
+    { 
+      field: "expiry_date", 
+      headerName: "Expiry", 
+      width: 130,
+      valueFormatter: (params) => {
+        return params.value ? new Date(params.value).toLocaleDateString('en-IN') : 'N/A';
+      }
+    },
+    {
+      field: "qty_available",
+      headerName: "Quantity",
+      width: 120,
+      renderCell: (params) => {
+        const qty = params.value;
+        const color = qty === 0 ? 'error' : qty < 10 ? 'warning' : 'success';
+        return (
+          <Chip 
+            label={qty} 
+            color={color} 
+            size="small" 
+          />
+        );
+      }
+    },
+    {
+      field: "actions",
+      headerName: "Actions",
+      width: 120,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <IconButton 
+            size="small" 
+            color="error" 
+            onClick={() => handleDelete(params.row.id)}
+            title="Delete Batch"
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      )
+    }
+  ];
 
   // Load all batches, products, and warehouses on component mount
   useEffect(() => {
@@ -51,9 +115,11 @@ const BatchManagement = () => {
     try {
       setLoading(true);
       const response = await fetchBatches();
+      console.log('Batches loaded:', response.data);
       setBatches(response.data || []);
     } catch (error) {
       console.error('Failed to load batches:', error);
+      setError('Failed to load batches');
       setBatches([]);
     } finally {
       setLoading(false);
@@ -87,17 +153,22 @@ const BatchManagement = () => {
 
   const handleSubmit = async () => {
     if (!selectedProduct) {
-      alert('Please select a product');
+      setError('Please select a product');
       return;
     }
 
     if (!selectedWarehouse) {
-      alert('Please select a warehouse');
+      setError('Please select a warehouse');
       return;
     }
 
     if (!formData.batch_no) {
-      alert('Please enter a batch number');
+      setError('Please enter a batch number');
+      return;
+    }
+
+    if (formData.qty_received <= 0) {
+      setError('Quantity must be greater than 0');
       return;
     }
 
@@ -111,12 +182,26 @@ const BatchManagement = () => {
       await createBatch(selectedProduct.id, batchData);
       
       // Reload batches and close modal
-      loadBatches();
+      await loadBatches();
       handleClose();
+      setError('');
       
     } catch (error) {
       console.error('Failed to create batch:', error);
-      alert('Failed to create batch. Please try again.');
+      setError(error.response?.data?.error || 'Failed to create batch. Please try again.');
+    }
+  };
+
+  const handleDelete = async (batchId) => {
+    if (window.confirm('Are you sure you want to delete this batch?')) {
+      try {
+        await deleteBatch(batchId);
+        await loadBatches();
+        setError('');
+      } catch (error) {
+        console.error('Failed to delete batch:', error);
+        setError(error.response?.data?.error || 'Failed to delete batch');
+      }
     }
   };
 
@@ -130,22 +215,26 @@ const BatchManagement = () => {
     });
     setSelectedProduct(null);
     setSelectedWarehouse(null);
+    setError('');
   };
 
   return (
-    <>
-      <Typography variant="h4" gutterBottom>
-        Batch Management
-      </Typography>
+    <Box sx={{ p: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h4">
+          Batch Management
+        </Typography>
+        <Button 
+          variant="contained" 
+          onClick={() => setOpen(true)} 
+          disabled={loading}
+          startIcon={<AddCircleOutlineIcon />}
+        >
+          Add New Batch
+        </Button>
+      </Box>
 
-      <Button 
-        variant="contained" 
-        onClick={() => setOpen(true)} 
-        sx={{ mb: 2 }}
-        disabled={loading}
-      >
-        Add New Batch
-      </Button>
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
       <DataTable 
         rows={batches} 
@@ -158,6 +247,8 @@ const BatchManagement = () => {
           <Typography variant="h6" gutterBottom>
             Add New Batch
           </Typography>
+
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
           {/* Product Selection */}
           <Autocomplete
@@ -176,7 +267,7 @@ const BatchManagement = () => {
             )}
           />
 
-          {/* ✅ NEW: Warehouse Selection */}
+          {/* Warehouse Selection */}
           <Autocomplete
             options={warehouses}
             getOptionLabel={(option) => option.name}
@@ -238,6 +329,7 @@ const BatchManagement = () => {
             onChange={handleChange}
             margin="normal"
             inputProps={{ min: 0, step: 1 }}
+            required
           />
 
           {/* Action Buttons */}
@@ -255,7 +347,7 @@ const BatchManagement = () => {
           </Box>
         </Box>
       </Modal>
-    </>
+    </Box>
   );
 };
 
