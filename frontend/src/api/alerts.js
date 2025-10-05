@@ -1,7 +1,5 @@
 import axiosClient from "./axiosClient";
 
-export const fetchAlerts = () => axiosClient.get("/alerts");
-
-export const dismissAlert = (id) => axiosClient.post(`/alerts/${id}/dismiss`);
-
-export const checkAlerts = () => axiosClient.post("/alerts/check");
+export const fetchActiveAlerts = () => axiosClient.get('/alerts/active');
+export const fetchAlertSummary = () => axiosClient.get('/alerts/summary');
+export const checkAlerts = () => axiosClient.post('/alerts/check');
