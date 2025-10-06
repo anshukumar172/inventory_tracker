@@ -36,7 +36,7 @@ const MainLayout = ({ user, onLogout }) => {
           flexGrow: 1,
           p: 3,
           marginTop: '64px', // Account for AppBar height
-          marginLeft: '240px' // Account for Sidebar width
+          marginLeft: '0px' // Account for Sidebar width
         }}
       >
         <Outlet />

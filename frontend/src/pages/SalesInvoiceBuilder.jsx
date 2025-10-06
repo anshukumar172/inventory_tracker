@@ -31,19 +31,56 @@ const SalesInvoiceBuilder = () => {
   const [shippingAddress, setShippingAddress] = useState("");
 
   useEffect(() => {
-    fetchCustomers().then(res => setCustomers(res.data));
-    fetchProducts().then(res => setProducts(res.data));
+    fetchCustomers().then(res => setCustomers(res.data || []));
+    fetchProducts().then(res => setProducts(res.data || []));
   }, []);
 
-  // Fetch batches when a product is selected or changed
+  // ✅ UPDATED: Fetch batches when product is selected - Filter by product_id AND qty > 0
   useEffect(() => {
-    items.forEach((item, idx) => {
-      if (item.product) {
-        fetchBatches(item.product.id).then(res =>
-          setBatchesList(prev => ({ ...prev, [idx]: res.data }))
-        );
+    const loadBatchesForItems = async () => {
+      for (let idx = 0; idx < items.length; idx++) {
+        const item = items[idx];
+        
+        if (item.product && item.product.id) {
+          try {
+            console.log(`\n🔍 Loading batches for: ${item.product.name} (ID: ${item.product.id})`);
+            
+            const response = await fetchBatches(item.product.id);
+            const allBatches = response.data || [];
+            
+            console.log(`   📦 Total batches from API: ${allBatches.length}`);
+            
+            // ✅ FILTER: Only batches for THIS product with qty > 0
+            const availableBatches = allBatches.filter(batch => {
+              const isCorrectProduct = batch.product_id === item.product.id;
+              const hasStock = batch.qty_available > 0;
+              
+              return isCorrectProduct && hasStock;
+            });
+            
+            console.log(`   ✅ Available batches with stock: ${availableBatches.length}`);
+            availableBatches.forEach(b => {
+              console.log(`      • ${b.batch_no}: ${b.qty_available} units (Warehouse: ${b.warehouse_name || 'N/A'})`);
+            });
+            
+            setBatchesList(prev => ({ ...prev, [idx]: availableBatches }));
+            
+          } catch (error) {
+            console.error(`   ❌ Failed to load batches for product ${item.product.id}:`, error);
+            setBatchesList(prev => ({ ...prev, [idx]: [] }));
+          }
+        } else {
+          // Clear batches if no product selected
+          setBatchesList(prev => {
+            const updated = { ...prev };
+            delete updated[idx];
+            return updated;
+          });
+        }
       }
-    });
+    };
+    
+    loadBatchesForItems();
     // eslint-disable-next-line
   }, [JSON.stringify(items.map(i => i.product?.id))]);
 
@@ -65,17 +102,20 @@ const SalesInvoiceBuilder = () => {
   };
 
   const removeItem = (index) => {
-    const newItems = items.filter((_, i) => i !== index);
-    setItems(newItems);
-    // Remove batches for deleted row
-    setBatchesList(prev => {
-      const updated = { ...prev };
-      delete updated[index];
-      return updated;
-    });
+    if (items.length > 1) {
+      const newItems = items.filter((_, i) => i !== index);
+      setItems(newItems);
+      
+      // Remove batches for deleted row
+      setBatchesList(prev => {
+        const updated = { ...prev };
+        delete updated[index];
+        return updated;
+      });
+    }
   };
 
-  // ✅ Calculate GST breakdown
+  // Calculate GST breakdown
   const calculateTotals = () => {
     const companyStateCode = '27'; // Maharashtra - should come from config
     const isIntraState = selectedCustomer?.state_code === companyStateCode;
@@ -128,6 +168,13 @@ const SalesInvoiceBuilder = () => {
       return;
     }
     
+    // Check if quantity exceeds available stock
+    const exceedsStock = items.some(i => i.batch && i.qty > i.batch.qty_available);
+    if (exceedsStock) {
+      alert("Some items exceed available stock quantity!");
+      return;
+    }
+    
     const invoiceData = {
       customer_id: selectedCustomer.id,
       billing_address: billingAddress,
@@ -142,7 +189,7 @@ const SalesInvoiceBuilder = () => {
     
     createInvoice(invoiceData)
       .then(() => {
-        alert("Invoice created successfully");
+        alert("Invoice created successfully!");
         // Reset form
         setSelectedCustomer(null);
         setBillingAddress("");
@@ -157,139 +204,219 @@ const SalesInvoiceBuilder = () => {
   };
 
   return (
-    <Box sx={{ p: 2, maxWidth: 1000, mx: 'auto' }}>
-      <Typography variant="h5" gutterBottom>Sales Invoice Builder</Typography>
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom>
+        Sales Invoice Builder
+      </Typography>
       
-      <Autocomplete
-        options={customers}
-        getOptionLabel={c => c.name || ""}
-        onChange={(e, v) => setSelectedCustomer(v)}
-        value={selectedCustomer}
-        renderInput={(params) => <TextField {...params} label="Select Customer" margin="normal" required />}
-      />
+      {/* Customer Details Section */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Typography variant="h6" gutterBottom>Customer Details</Typography>
+        
+        <Autocomplete
+          options={customers}
+          getOptionLabel={c => `${c.name}${c.email ? ` (${c.email})` : ''}`}
+          onChange={(e, v) => {
+            setSelectedCustomer(v);
+            if (v) {
+              setBillingAddress(v.billing_address || "");
+              setShippingAddress(v.shipping_address || "");
+            } else {
+              setBillingAddress("");
+              setShippingAddress("");
+            }
+          }}
+          value={selectedCustomer}
+          renderInput={(params) => (
+            <TextField 
+              {...params} 
+              label="Select Customer *" 
+              margin="normal" 
+              required 
+              helperText={!selectedCustomer ? "Please select a customer to create invoice" : ""}
+            />
+          )}
+        />
+        
+        <TextField
+          label="Billing Address"
+          value={billingAddress}
+          multiline
+          rows={2}
+          fullWidth
+          margin="normal"
+          onChange={(e) => setBillingAddress(e.target.value)}
+        />
+        
+        <TextField
+          label="Shipping Address"
+          value={shippingAddress}
+          multiline
+          rows={2}
+          fullWidth
+          margin="normal"
+          onChange={(e) => setShippingAddress(e.target.value)}
+        />
+      </Paper>
       
-      <TextField
-        label="Billing Address"
-        value={billingAddress}
-        multiline
-        rows={2}
-        fullWidth
-        margin="normal"
-        onChange={(e) => setBillingAddress(e.target.value)}
-      />
-      
-      <TextField
-        label="Shipping Address"
-        value={shippingAddress}
-        multiline
-        rows={2}
-        fullWidth
-        margin="normal"
-        onChange={(e) => setShippingAddress(e.target.value)}
-      />
-      
-      <Table sx={{ mt: 2 }}>
-        <TableHead>
-          <TableRow>
-            <TableCell>Product</TableCell>
-            <TableCell>Batch</TableCell>
-            <TableCell>Qty</TableCell>
-            <TableCell>Unit Price</TableCell>
-            <TableCell>Amount</TableCell>
-            <TableCell>Remove</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {items.map((item, index) => (
-            <TableRow key={index}>
-              <TableCell sx={{ minWidth: 150 }}>
-                <Autocomplete
-                  options={products}
-                  getOptionLabel={p => p.name || ""}
-                  value={item.product}
-                  onChange={(e, v) => handleItemChange(index, "product", v)}
-                  renderInput={(params) => <TextField {...params} label="Product" size="small" />}
-                />
-              </TableCell>
-              
-              <TableCell sx={{ minWidth: 150 }}>
-                <Autocomplete
-                  options={batchesList[index] || []}
-                  getOptionLabel={b => b.batch_no || ""}
-                  value={item.batch}
-                  onChange={(e, v) => handleItemChange(index, "batch", v)}
-                  renderInput={(params) => <TextField {...params} label="Batch" size="small" />}
-                  disabled={!item.product}
-                />
-              </TableCell>
-              
-              <TableCell>
-                <TextField
-                  type="number"
-                  value={item.qty}
-                  onChange={e => handleItemChange(index, "qty", Number(e.target.value))}
-                  inputProps={{ min: 1 }}
-                  size="small"
-                  sx={{ width: 80 }}
-                />
-              </TableCell>
-              
-              <TableCell>
-                <TextField
-                  type="number"
-                  value={item.unit_price}
-                  InputProps={{ readOnly: true }}
-                  size="small"
-                  sx={{ width: 100 }}
-                  disabled
-                />
-              </TableCell>
+      {/* Invoice Items Section */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Typography variant="h6" gutterBottom>Invoice Items</Typography>
+        
+        <Box sx={{ overflowX: 'auto' }}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Product</TableCell>
+                <TableCell>Batch</TableCell>
+                <TableCell>Qty</TableCell>
+                <TableCell>Unit Price</TableCell>
+                <TableCell>Amount</TableCell>
+                <TableCell>Remove</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {items.map((item, index) => (
+                <TableRow key={index}>
+                  {/* Product Selection */}
+                  <TableCell sx={{ minWidth: 200 }}>
+                    <Autocomplete
+                      options={products}
+                      getOptionLabel={p => `${p.name} (${p.sku})`}
+                      value={item.product}
+                      onChange={(e, v) => handleItemChange(index, "product", v)}
+                      renderInput={(params) => (
+                        <TextField {...params} label="Product *" size="small" required />
+                      )}
+                    />
+                  </TableCell>
+                  
+                  {/* Batch Selection */}
+                  <TableCell sx={{ minWidth: 250 }}>
+                    <Autocomplete
+                      options={batchesList[index] || []}
+                      getOptionLabel={b => `${b.batch_no} (Stock: ${b.qty_available})`}
+                      value={item.batch}
+                      onChange={(e, v) => handleItemChange(index, "batch", v)}
+                      renderInput={(params) => (
+                        <TextField 
+                          {...params} 
+                          label="Batch *" 
+                          size="small"
+                          required
+                          helperText={
+                            !item.product 
+                              ? "Select product first" 
+                              : (batchesList[index] || []).length === 0 
+                                ? "⚠️ No stock available" 
+                                : `${(batchesList[index] || []).length} batch(es) with stock`
+                          }
+                        />
+                      )}
+                      disabled={!item.product || (batchesList[index] || []).length === 0}
+                      renderOption={(props, option) => (
+                        <li {...props}>
+                          <Box>
+                            <Typography variant="body2" fontWeight="bold">
+                              {option.batch_no}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Stock: {option.qty_available} units
+                              {option.warehouse_name && ` • ${option.warehouse_name}`}
+                              {option.expiry_date && ` • Exp: ${new Date(option.expiry_date).toLocaleDateString('en-IN')}`}
+                            </Typography>
+                          </Box>
+                        </li>
+                      )}
+                    />
+                  </TableCell>
+                  
+                  {/* Quantity */}
+                  <TableCell>
+                    <TextField
+                      type="number"
+                      value={item.qty}
+                      onChange={e => handleItemChange(index, "qty", Number(e.target.value) || 1)}
+                      inputProps={{ 
+                        min: 1,
+                        max: item.batch?.qty_available || 999999
+                      }}
+                      size="small"
+                      sx={{ width: 90 }}
+                      helperText={item.batch ? `Max: ${item.batch.qty_available}` : ''}
+                      error={item.batch && item.qty > item.batch.qty_available}
+                    />
+                  </TableCell>
+                  
+                  {/* Unit Price */}
+                  <TableCell>
+                    <TextField
+                      type="number"
+                      value={item.unit_price}
+                      onChange={e => handleItemChange(index, "unit_price", Number(e.target.value) || 0)}
+                      size="small"
+                      sx={{ width: 110 }}
+                      inputProps={{ min: 0, step: 0.01 }}
+                    />
+                  </TableCell>
 
-              {/* ✅ Line Item Amount */}
-              <TableCell>
-                <Typography>₹{(item.qty * item.unit_price).toFixed(2)}</Typography>
-              </TableCell>
-              
-              <TableCell>
-                <IconButton onClick={() => removeItem(index)} color="error">
-                  <RemoveCircleOutlineIcon />
-                </IconButton>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                  {/* Line Amount */}
+                  <TableCell>
+                    <Typography fontWeight="bold" color="primary">
+                      ₹{(item.qty * item.unit_price).toFixed(2)}
+                    </Typography>
+                  </TableCell>
+                  
+                  {/* Remove Button */}
+                  <TableCell>
+                    <IconButton 
+                      onClick={() => removeItem(index)} 
+                      color="error"
+                      disabled={items.length === 1}
+                      title="Remove item"
+                    >
+                      <RemoveCircleOutlineIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
+        
+        <Button 
+          startIcon={<AddCircleOutlineIcon />} 
+          onClick={addItem} 
+          sx={{ mt: 2 }}
+          variant="outlined"
+        >
+          Add Item
+        </Button>
+      </Paper>
       
-      <Button 
-        startIcon={<AddCircleOutlineIcon />} 
-        onClick={addItem} 
-        sx={{ mt: 1 }}
-        variant="outlined"
-      >
-        Add Item
-      </Button>
-      
-      {/* ✅ GST Breakdown Summary */}
-      <Paper elevation={2} sx={{ mt: 3, p: 2, maxWidth: 400, ml: 'auto' }}>
+      {/* GST Breakdown Summary */}
+      <Paper elevation={2} sx={{ p: 2, maxWidth: 400, ml: 'auto', mb: 2 }}>
+        <Typography variant="h6" gutterBottom>Invoice Summary</Typography>
+        
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
           <Typography>Taxable Value:</Typography>
-          <Typography>₹{totals.taxableValue.toFixed(2)}</Typography>
+          <Typography fontWeight="bold">₹{totals.taxableValue.toFixed(2)}</Typography>
         </Box>
         
         {totals.isIntraState ? (
           <>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography>CGST:</Typography>
+              <Typography>CGST (9%):</Typography>
               <Typography>₹{totals.cgstAmount.toFixed(2)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography>SGST:</Typography>
+              <Typography>SGST (9%):</Typography>
               <Typography>₹{totals.sgstAmount.toFixed(2)}</Typography>
             </Box>
           </>
         ) : (
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography>IGST:</Typography>
+            <Typography>IGST (18%):</Typography>
             <Typography>₹{totals.igstAmount.toFixed(2)}</Typography>
           </Box>
         )}
@@ -298,19 +425,40 @@ const SalesInvoiceBuilder = () => {
         
         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
           <Typography variant="h6">Total Amount:</Typography>
-          <Typography variant="h6">₹{totals.totalAmount.toFixed(2)}</Typography>
+          <Typography variant="h6" color="primary">
+            ₹{totals.totalAmount.toFixed(2)}
+          </Typography>
         </Box>
       </Paper>
       
-      <Button 
-        variant="contained" 
-        color="primary" 
-        sx={{ mt: 2 }} 
-        onClick={handleSubmit}
-        disabled={!selectedCustomer || items.length === 0}
-      >
-        Save Invoice
-      </Button>
+      {/* Submit Button */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+        <Button 
+          variant="outlined" 
+          size="large"
+          onClick={() => {
+            if (window.confirm('Are you sure you want to reset the form?')) {
+              setSelectedCustomer(null);
+              setBillingAddress("");
+              setShippingAddress("");
+              setItems([{ product: null, batch: null, qty: 1, unit_price: 0 }]);
+              setBatchesList({});
+            }
+          }}
+        >
+          Reset Form
+        </Button>
+        
+        <Button 
+          variant="contained" 
+          color="primary" 
+          size="large"
+          onClick={handleSubmit}
+          disabled={!selectedCustomer || items.length === 0}
+        >
+          Generate Invoice
+        </Button>
+      </Box>
     </Box>
   );
 };
