@@ -25,7 +25,7 @@ const SalesInvoiceBuilder = () => {
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [items, setItems] = useState([{ product: null, batch: null, qty: 1, unit_price: 0 }]);
+  const [items, setItems] = useState([{ product: null, batch: null, qty: '', unit_price: 0 }]);
   const [batchesList, setBatchesList] = useState({});
   const [billingAddress, setBillingAddress] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
@@ -98,7 +98,7 @@ const SalesInvoiceBuilder = () => {
   };
 
   const addItem = () => {
-    setItems([...items, { product: null, batch: null, qty: 1, unit_price: 0 }]);
+    setItems([...items, { product: null, batch: null, qty: '', unit_price: 0 }]);
   };
 
   const removeItem = (index) => {
@@ -194,7 +194,7 @@ const SalesInvoiceBuilder = () => {
         setSelectedCustomer(null);
         setBillingAddress("");
         setShippingAddress("");
-        setItems([{ product: null, batch: null, qty: 1, unit_price: 0 }]);
+        setItems([{ product: null, batch: null, qty: '', unit_price: 0 }]);
         setBatchesList({});
       })
       .catch((error) => {
@@ -338,8 +338,9 @@ const SalesInvoiceBuilder = () => {
                       value={item.qty}
                       onChange={e => handleItemChange(index, "qty", Number(e.target.value) || 1)}
                       inputProps={{ 
-                        min: 1,
-                        max: item.batch?.qty_available || 999999
+                        min: 0,
+                        max: item.batch?.qty_available || 999999,
+                        step:1
                       }}
                       size="small"
                       sx={{ width: 90 }}

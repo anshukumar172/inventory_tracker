@@ -24,7 +24,7 @@ const getDashboardKpis = async (req, res) => {
         FROM products p
         LEFT JOIN batches b ON p.id = b.product_id
         GROUP BY p.id, p.name
-        HAVING current_stock < 10
+        HAVING current_stock < 50
       ) as low_stock_products
     `;
 
@@ -92,16 +92,29 @@ const getDashboardKpis = async (req, res) => {
 
 const getRecentInvoices = async (req, res) => {
   try {
-    console.log('📋 Fetching recent invoices...');
+    console.log('📋 Fetching recent invoices with items...');
 
     const recentInvoicesQuery = `
       SELECT 
         si.id,
         DATE_FORMAT(si.invoice_date, '%Y-%m-%d') as date,
         COALESCE(c.name, 'Unknown Customer') as customerName,
-        COALESCE(si.total_amount, 0) as totalAmount
+        COALESCE(si.total_amount, 0) as totalAmount,
+        GROUP_CONCAT(
+          p.name
+          ORDER BY p.name
+          SEPARATOR ', '
+        ) as products,
+        GROUP_CONCAT(
+          CAST(sii.qty AS UNSIGNED)
+          ORDER BY p.name
+          SEPARATOR ', '
+        ) as quantities
       FROM sales_invoices si
       LEFT JOIN customers c ON si.customer_id = c.id
+      LEFT JOIN sales_invoice_items sii ON si.id = sii.sales_invoice_id
+      LEFT JOIN products p ON sii.product_id = p.id
+      GROUP BY si.id, si.invoice_date, c.name, si.total_amount, si.created_at
       ORDER BY si.created_at DESC
       LIMIT 10
     `;
@@ -113,11 +126,11 @@ const getRecentInvoices = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error fetching recent invoices:', error);
-    
-    // Return empty array if database query fails
     res.json([]);
   }
 };
+
+
 
 module.exports = {
   getDashboardKpis,

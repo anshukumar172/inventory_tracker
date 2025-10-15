@@ -36,6 +36,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const batchStandaloneRoutes = require('./routes/batchStandaloneRoutes');
 const stockMovementRoutes = require('./routes/stockMovementRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const stockRoutes = require('./routes/stock');
 
 console.log('✅ All route files loaded');
 
@@ -54,6 +55,7 @@ app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/batches', batchStandaloneRoutes);
 app.use('/api/v1/stock-movements', stockMovementRoutes);
 app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/stock', stockRoutes);
 
 console.log('🔗 All routes mounted');
 

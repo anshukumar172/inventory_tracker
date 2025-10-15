@@ -14,9 +14,7 @@ import DataTable from "../components/DataTable";
 import { fetchBatches, createBatch, deleteBatch } from "../api/batches";
 import { fetchProducts } from "../api/products";
 import { fetchWarehouses } from "../api/warehouses";
-import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
 const style = {
@@ -48,31 +46,59 @@ const BatchManagement = () => {
     qty_received: 0,
   });
 
-  // Define columns with actions and formatted dates
+  // ✅ FIXED: Columns now use flex to fill available space
   const columns = [
-    { field: "batch_no", headerName: "Batch No", width: 150 },
-    { field: "product_name", headerName: "Product", width: 200 },
-    { field: "warehouse_name", headerName: "Warehouse", width: 180 },
+    { 
+      field: "batch_no", 
+      headerName: "Batch No", 
+      flex: 1,
+      minWidth: 130
+    },
+    { 
+      field: "product_name", 
+      headerName: "Product", 
+      flex: 2,
+      minWidth: 180
+    },
+    { 
+      field: "warehouse_name", 
+      headerName: "Warehouse", 
+      flex: 1.5,
+      minWidth: 150
+    },
     { 
       field: "manufacturing_date", 
-      headerName: "Manufactured", 
-      width: 130,
+      headerName: "Mfg Date",
+      flex: 1,
+      minWidth: 100,
       valueFormatter: (params) => {
-        return params.value ? new Date(params.value).toLocaleDateString('en-IN') : 'N/A';
+        return params.value ? new Date(params.value).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: '2-digit'
+        }) : 'N/A';
       }
     },
     { 
       field: "expiry_date", 
-      headerName: "Expiry", 
-      width: 130,
+      headerName: "Expiry",
+      flex: 1,
+      minWidth: 100,
       valueFormatter: (params) => {
-        return params.value ? new Date(params.value).toLocaleDateString('en-IN') : 'N/A';
+        return params.value ? new Date(params.value).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: '2-digit'
+        }) : 'N/A';
       }
     },
     {
       field: "qty_available",
-      headerName: "Quantity",
-      width: 120,
+      headerName: "Qty",
+      flex: 0.8,
+      minWidth: 80,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         const qty = params.value;
         const color = qty === 0 ? 'error' : qty < 10 ? 'warning' : 'success';
@@ -80,7 +106,8 @@ const BatchManagement = () => {
           <Chip 
             label={qty} 
             color={color} 
-            size="small" 
+            size="small"
+            sx={{ minWidth: 45 }}
           />
         );
       }
@@ -88,23 +115,24 @@ const BatchManagement = () => {
     {
       field: "actions",
       headerName: "Actions",
-      width: 120,
+      flex: 0.7,
+      minWidth: 80,
+      sortable: false,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => (
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
-          <IconButton 
-            size="small" 
-            color="error" 
-            onClick={() => handleDelete(params.row.id)}
-            title="Delete Batch"
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        </Box>
+        <IconButton 
+          size="small" 
+          color="error" 
+          onClick={() => handleDelete(params.row.id)}
+          title="Delete Batch"
+        >
+          <DeleteIcon fontSize="small" />
+        </IconButton>
       )
     }
   ];
 
-  // Load all batches, products, and warehouses on component mount
   useEffect(() => {
     loadBatches();
     loadProducts();
@@ -181,7 +209,6 @@ const BatchManagement = () => {
 
       await createBatch(selectedProduct.id, batchData);
       
-      // Reload batches and close modal
       await loadBatches();
       handleClose();
       setError('');
@@ -219,7 +246,7 @@ const BatchManagement = () => {
   };
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: 2, width: '100%', height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h4">
           Batch Management
@@ -230,17 +257,24 @@ const BatchManagement = () => {
           disabled={loading}
           startIcon={<AddCircleOutlineIcon />}
         >
-          Add New Batch
+          ADD NEW BATCH
         </Button>
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
-      <DataTable 
-        rows={batches} 
-        columns={columns} 
-        loading={loading}
-      />
+      {/* ✅ FIXED: Table fills available width */}
+      <Box sx={{ 
+        flex: 1,
+        width: '100%',
+        minHeight: 0
+      }}>
+        <DataTable 
+          rows={batches} 
+          columns={columns} 
+          loading={loading}
+        />
+      </Box>
 
       <Modal open={open} onClose={handleClose}>
         <Box sx={style}>
@@ -250,7 +284,6 @@ const BatchManagement = () => {
 
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-          {/* Product Selection */}
           <Autocomplete
             options={products}
             getOptionLabel={(option) => `${option.name} (${option.sku})`}
@@ -267,7 +300,6 @@ const BatchManagement = () => {
             )}
           />
 
-          {/* Warehouse Selection */}
           <Autocomplete
             options={warehouses}
             getOptionLabel={(option) => option.name}
@@ -284,7 +316,6 @@ const BatchManagement = () => {
             )}
           />
 
-          {/* Batch Number */}
           <TextField
             fullWidth
             label="Batch Number"
@@ -295,7 +326,6 @@ const BatchManagement = () => {
             required
           />
 
-          {/* Manufacturing Date */}
           <TextField
             fullWidth
             type="date"
@@ -307,7 +337,6 @@ const BatchManagement = () => {
             InputLabelProps={{ shrink: true }}
           />
 
-          {/* Expiry Date */}
           <TextField
             fullWidth
             type="date"
@@ -319,7 +348,6 @@ const BatchManagement = () => {
             InputLabelProps={{ shrink: true }}
           />
 
-          {/* Quantity */}
           <TextField
             fullWidth
             type="number"
@@ -332,7 +360,6 @@ const BatchManagement = () => {
             required
           />
 
-          {/* Action Buttons */}
           <Box sx={{ mt: 2, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
             <Button onClick={handleClose} variant="outlined">
               Cancel

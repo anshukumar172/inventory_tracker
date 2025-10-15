@@ -9,4 +9,7 @@ router.use(authenticateToken);
 // GET /api/v1/dashboard/kpis
 router.get('/kpis', dashboardController.getDashboardKpis);
 
+// ✅ ADD THIS: GET /api/v1/dashboard/invoices
+router.get('/invoices', dashboardController.getRecentInvoices);
+
 module.exports = router;

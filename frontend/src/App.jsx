@@ -15,6 +15,9 @@ import AlertsPage from "./pages/AlertsPage";
 import Reports from "./pages/Reports";
 import Login from "./pages/Login";
 import ProductMaster from "./pages/productMaster";
+// ✅ Import the new pages
+import LowStockItems from "./pages/LowStockItems";
+import ExpiringItems from "./pages/ExpiringItems";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -126,6 +129,9 @@ function App() {
                 <Route path="sales-invoice" element={<SalesInvoiceBuilder />} />
                 <Route path="alerts" element={<AlertsPage />} />
                 <Route path="reports" element={<Reports />} />
+                {/* ✅ NEW ROUTES - Low Stock and Expiring Items */}
+                <Route path="low-stock" element={<LowStockItems />} />
+                <Route path="expiring-items" element={<ExpiringItems />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>
             ) : (
